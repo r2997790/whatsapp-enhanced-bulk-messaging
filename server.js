@@ -26,7 +26,7 @@ app.use(express.static('.'));
 
 const PORT = process.env.PORT || 8080;
 
-// State management - simplified approach
+// State management
 let sock = null;
 let qrCodeData = null;
 let connectionStatus = 'disconnected';
@@ -46,7 +46,7 @@ if (!fs.existsSync(authDir)) {
     fs.mkdirSync(authDir, { recursive: true });
 }
 
-// Silent logger - prevents most baileys logging issues
+// Silent logger
 const logger = {
     level: 'silent',
     info: () => {},
@@ -57,17 +57,16 @@ const logger = {
     child: () => logger
 };
 
-// Prevent rapid reconnection loops - simplified approach
 function canAttemptConnection() {
     const now = Date.now();
     const timeSinceLastAttempt = now - lastQRTime;
     
-    if (timeSinceLastAttempt < 10000) { // 10 second cooldown
+    if (timeSinceLastAttempt < 10000) {
         console.log('⏳ Cooldown active, skipping connection attempt');
         return false;
     }
     
-    if (connectionAttempts >= 5) { // Max 5 attempts
+    if (connectionAttempts >= 5) {
         console.log('🛑 Max connection attempts reached');
         return false;
     }
@@ -75,7 +74,6 @@ function canAttemptConnection() {
     return true;
 }
 
-// Reset connection state
 function resetConnectionState() {
     connectionAttempts = 0;
     lastQRTime = 0;
@@ -101,7 +99,6 @@ async function connectToWhatsApp() {
         
         console.log(`🔄 Connection attempt ${connectionAttempts}/5`);
 
-        // Cleanup existing socket
         if (sock) {
             try {
                 sock.end();
@@ -110,17 +107,15 @@ async function connectToWhatsApp() {
             } catch (e) {}
         }
 
-        // Use persistent auth directory (don't clear it)
         const { state, saveCreds } = await useMultiFileAuthState(authDir);
         console.log('🔐 Using persistent auth state');
 
-        // Create socket with simple configuration based on reference
         sock = makeWASocket({
             auth: state,
             printQRInTerminal: false,
             logger: logger,
             browser: ['WhatsApp', 'Desktop', '2.2412.54'],
-            connectTimeoutMs: 90000, // Longer timeout
+            connectTimeoutMs: 90000,
             defaultQueryTimeoutMs: 90000,
             keepAliveIntervalMs: 20000,
             generateHighQualityLinkPreview: false,
@@ -133,7 +128,6 @@ async function connectToWhatsApp() {
 
         console.log('✅ Socket created');
 
-        // Single connection update handler with strict state management
         sock.ev.on('connection.update', async (update) => {
             const { connection, lastDisconnect, qr } = update;
             const statusCode = lastDisconnect?.error?.output?.statusCode;
@@ -145,7 +139,6 @@ async function connectToWhatsApp() {
                 attempts: connectionAttempts 
             });
 
-            // Handle QR code
             if (qr && connectionStatus !== 'connected') {
                 try {
                     console.log('📱 QR Code generated, scan with WhatsApp app');
@@ -165,13 +158,12 @@ async function connectToWhatsApp() {
                 }
             }
 
-            // Handle connection state changes
             if (connection === 'open') {
                 console.log('🎉 CONNECTION SUCCESSFUL!');
                 connectionStatus = 'connected';
                 qrCodeData = null;
                 isConnecting = false;
-                resetConnectionState(); // Reset on success
+                resetConnectionState();
                 
                 io.emit('connection-status', connectionStatus);
                 io.emit('qr-code', null);
@@ -188,7 +180,6 @@ async function connectToWhatsApp() {
                 isConnecting = false;
                 io.emit('connection-status', connectionStatus);
                 
-                // CRITICAL: Only reconnect on specific conditions
                 let shouldReconnect = false;
                 
                 if (statusCode === DisconnectReason.loggedOut) {
@@ -216,13 +207,10 @@ async function connectToWhatsApp() {
                     shouldReconnect = connectionAttempts < 2;
                     
                 } else {
-                    // For authentication failures and unknown disconnects
                     console.log('❓ Authentication or unknown failure');
-                    // DON'T auto-reconnect - wait for manual retry
                     shouldReconnect = false;
                 }
 
-                // Clear QR code on disconnect
                 qrCodeData = null;
                 io.emit('qr-code', null);
 
@@ -237,10 +225,8 @@ async function connectToWhatsApp() {
             }
         });
 
-        // Save credentials
         sock.ev.on('creds.update', saveCreds);
 
-        // Handle incoming messages for logs
         sock.ev.on('messages.upsert', async (m) => {
             console.log('📩 Message received - connection active');
         });
@@ -253,11 +239,9 @@ async function connectToWhatsApp() {
     }
 }
 
-// Manual reset function
 function manualReset() {
     console.log('🔄 Manual reset initiated');
     
-    // Stop current connection
     if (sock) {
         try {
             sock.end();
@@ -265,14 +249,12 @@ function manualReset() {
         } catch (e) {}
     }
     
-    // Clear auth directory
     try {
         const files = fs.readdirSync(authDir);
         files.forEach(file => fs.unlinkSync(path.join(authDir, file)));
         console.log('🧹 Auth directory cleared');
     } catch (e) {}
     
-    // Reset state
     resetConnectionState();
     connectionStatus = 'disconnected';
     qrCodeData = null;
@@ -281,9 +263,61 @@ function manualReset() {
     io.emit('qr-code', null);
 }
 
+// DIAGNOSTIC ROUTE TO CHECK FILE STATUS
+app.get('/debug', (req, res) => {
+    try {
+        const indexPath = path.join(__dirname, 'index.html');
+        const testPath = path.join(__dirname, 'test.html');
+        
+        const indexExists = fs.existsSync(indexPath);
+        const testExists = fs.existsSync(testPath);
+        
+        let indexStats = null;
+        let testStats = null;
+        let indexPreview = null;
+        let testPreview = null;
+        
+        if (indexExists) {
+            indexStats = fs.statSync(indexPath);
+            indexPreview = fs.readFileSync(indexPath, 'utf8').substring(0, 200);
+        }
+        
+        if (testExists) {
+            testStats = fs.statSync(testPath);
+            testPreview = fs.readFileSync(testPath, 'utf8').substring(0, 200);
+        }
+        
+        res.json({
+            timestamp: new Date().toISOString(),
+            indexHtml: {
+                exists: indexExists,
+                size: indexStats?.size,
+                modified: indexStats?.mtime,
+                preview: indexPreview
+            },
+            testHtml: {
+                exists: testExists,
+                size: testStats?.size,
+                modified: testStats?.mtime,
+                preview: testPreview
+            },
+            workingDirectory: process.cwd(),
+            files: fs.readdirSync(__dirname).filter(f => f.endsWith('.html'))
+        });
+    } catch (error) {
+        res.json({ error: error.message });
+    }
+});
+
 // Routes
 app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, 'index.html'));
+    try {
+        console.log('📄 Serving index.html from:', path.join(__dirname, 'index.html'));
+        res.sendFile(path.join(__dirname, 'index.html'));
+    } catch (error) {
+        console.error('❌ Error serving index.html:', error);
+        res.status(500).send('Error loading page');
+    }
 });
 
 app.get('/health', (req, res) => {
@@ -309,6 +343,12 @@ app.get('/api/status', (req, res) => {
     });
 });
 
+app.post('/api/connect', (req, res) => {
+    console.log('🔌 Connect API called');
+    connectToWhatsApp();
+    res.json({ success: true, message: 'Connection initiated' });
+});
+
 app.post('/api/reset', (req, res) => {
     manualReset();
     res.json({ success: true, message: 'Connection reset' });
@@ -330,7 +370,6 @@ app.post('/api/send-message', async (req, res) => {
 
         await sock.sendMessage(formattedNumber, { text: message });
         
-        // Log the message
         messageLogs.push({
             id: Date.now(),
             number: number,
@@ -376,7 +415,6 @@ app.post('/api/send-bulk', async (req, res) => {
                 await sock.sendMessage(formattedNumber, { text: message });
                 results.push({ number, success: true });
                 
-                // Log each message
                 messageLogs.push({
                     id: Date.now() + Math.random(),
                     number: number,
@@ -386,14 +424,12 @@ app.post('/api/send-bulk', async (req, res) => {
                     type: 'bulk'
                 });
                 
-                // Add delay between messages to avoid rate limiting
                 if (numbers.length > 1) {
-                    await delay(2000); // 2 second delay
+                    await delay(2000);
                 }
             } catch (error) {
                 results.push({ number, success: false, error: error.message });
                 
-                // Log failed message
                 messageLogs.push({
                     id: Date.now() + Math.random(),
                     number: number,
@@ -415,57 +451,6 @@ app.post('/api/send-bulk', async (req, res) => {
         console.error('Bulk send error:', error);
         res.status(500).json({ error: 'Failed to send bulk messages' });
     }
-});
-
-// Enhanced features - Contacts API
-app.get('/api/contacts', (req, res) => {
-    res.json(contacts);
-});
-
-app.post('/api/contacts', (req, res) => {
-    const { name, phone, email, tags } = req.body;
-    const contact = {
-        id: Date.now(),
-        name,
-        phone,
-        email,
-        tags: tags || [],
-        createdAt: new Date()
-    };
-    contacts.push(contact);
-    res.json({ success: true, contact });
-});
-
-app.put('/api/contacts/:id', (req, res) => {
-    const id = parseInt(req.params.id);
-    const contactIndex = contacts.findIndex(c => c.id === id);
-    if (contactIndex === -1) {
-        return res.status(404).json({ error: 'Contact not found' });
-    }
-    
-    contacts[contactIndex] = { ...contacts[contactIndex], ...req.body, updatedAt: new Date() };
-    res.json({ success: true, contact: contacts[contactIndex] });
-});
-
-app.delete('/api/contacts/:id', (req, res) => {
-    const id = parseInt(req.params.id);
-    const contactIndex = contacts.findIndex(c => c.id === id);
-    if (contactIndex === -1) {
-        return res.status(404).json({ error: 'Contact not found' });
-    }
-    
-    contacts.splice(contactIndex, 1);
-    res.json({ success: true });
-});
-
-// Message logs API
-app.get('/api/logs', (req, res) => {
-    res.json(messageLogs.slice(-100)); // Return last 100 logs
-});
-
-app.delete('/api/logs', (req, res) => {
-    messageLogs = [];
-    res.json({ success: true, message: 'Logs cleared' });
 });
 
 // Socket.io
@@ -505,5 +490,6 @@ server.listen(PORT, '0.0.0.0', () => {
     console.log('⏳ Ready - anti-loop protection enabled');
     console.log('📊 Enhanced features: Contacts, Groups, Templates, Logs');
     console.log('🎯 BULK MESSAGING ACTIVATED - Ready for deployment!');
+    console.log('🔍 Debug endpoint available at /debug');
     console.log('');
 });
