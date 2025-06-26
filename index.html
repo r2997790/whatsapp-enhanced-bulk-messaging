@@ -1,3 +1,586 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🚀 Enhanced WhatsApp Bulk Messaging Platform</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: #333;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #25D366 0%, #128C7E 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            font-weight: 700;
+        }
+
+        .header .subtitle {
+            font-size: 1.1rem;
+            opacity: 0.9;
+        }
+
+        .mode-toggle {
+            padding: 20px 30px;
+            background: #f8f9fa;
+            border-bottom: 1px solid #e9ecef;
+        }
+
+        .toggle-buttons {
+            display: flex;
+            background: #e9ecef;
+            border-radius: 12px;
+            padding: 4px;
+        }
+
+        .toggle-btn {
+            flex: 1;
+            padding: 12px 20px;
+            border: none;
+            background: transparent;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+
+        .toggle-btn.active {
+            background: #25D366;
+            color: white;
+            box-shadow: 0 2px 8px rgba(37, 211, 102, 0.3);
+        }
+
+        .main-content {
+            padding: 30px;
+        }
+
+        .status-section {
+            background: #f8f9fa;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 30px;
+            border-left: 4px solid #25D366;
+        }
+
+        .status-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+
+        .status-indicator {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #dc3545;
+        }
+
+        .status-indicator.connected {
+            background: #25D366;
+        }
+
+        .form-group {
+            margin-bottom: 25px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #495057;
+        }
+
+        .form-control {
+            width: 100%;
+            padding: 15px;
+            border: 2px solid #e9ecef;
+            border-radius: 12px;
+            font-size: 16px;
+            transition: all 0.3s ease;
+        }
+
+        .form-control:focus {
+            outline: none;
+            border-color: #25D366;
+            box-shadow: 0 0 0 3px rgba(37, 211, 102, 0.1);
+        }
+
+        textarea.form-control {
+            resize: vertical;
+            min-height: 120px;
+        }
+
+        .btn {
+            padding: 15px 30px;
+            border: none;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            text-decoration: none;
+            justify-content: center;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #25D366 0%, #128C7E 100%);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(37, 211, 102, 0.3);
+        }
+
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+        }
+
+        .btn-secondary:hover {
+            background: #5a6268;
+            transform: translateY(-2px);
+        }
+
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none !important;
+        }
+
+        .btn-group {
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+
+        .loader {
+            width: 20px;
+            height: 20px;
+            border: 2px solid #ffffff40;
+            border-top: 2px solid #ffffff;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        .message-result {
+            padding: 15px;
+            border-radius: 12px;
+            margin: 20px 0;
+            font-weight: 500;
+        }
+
+        .message-result.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .message-result.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .progress-section {
+            background: #f8f9fa;
+            border-radius: 12px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+
+        .progress-bar {
+            background: #e9ecef;
+            border-radius: 10px;
+            height: 20px;
+            overflow: hidden;
+            margin: 10px 0;
+        }
+
+        .progress-fill {
+            background: linear-gradient(90deg, #25D366, #128C7E);
+            height: 100%;
+            width: 0%;
+            transition: width 0.3s ease;
+        }
+
+        .bulk-status {
+            margin-top: 15px;
+            padding: 15px;
+            background: white;
+            border-radius: 8px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .bulk-status h4 {
+            margin-bottom: 10px;
+            color: #495057;
+        }
+
+        .bulk-status div {
+            padding: 5px 0;
+            border-bottom: 1px solid #e9ecef;
+        }
+
+        .features {
+            background: #f8f9fa;
+            border-radius: 12px;
+            padding: 20px;
+            margin-top: 30px;
+        }
+
+        .features h3 {
+            margin-bottom: 15px;
+            color: #495057;
+        }
+
+        .feature-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px;
+        }
+
+        .feature-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px;
+            background: white;
+            border-radius: 8px;
+        }
+
+        .feature-icon {
+            font-size: 1.2rem;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                margin: 10px;
+                border-radius: 15px;
+            }
+
+            .header h1 {
+                font-size: 2rem;
+            }
+
+            .main-content {
+                padding: 20px;
+            }
+
+            .btn-group {
+                flex-direction: column;
+            }
+
+            .btn {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🚀 Enhanced WhatsApp Platform</h1>
+            <p class="subtitle">Professional Bulk Messaging Solution v6.0.0</p>
+        </div>
+
+        <div class="mode-toggle">
+            <div class="toggle-buttons">
+                <button class="toggle-btn active" id="singleModeBtn">📱 Single Message</button>
+                <button class="toggle-btn" id="bulkModeBtn">📢 Bulk Messages</button>
+            </div>
+        </div>
+
+        <div class="main-content">
+            <div class="status-section">
+                <h3>🔗 Connection Status</h3>
+                <div class="status-item">
+                    <div class="status-indicator" id="statusIndicator"></div>
+                    <span id="statusText">Connecting...</span>
+                </div>
+                <div class="btn-group">
+                    <button class="btn btn-primary" id="connectBtn">
+                        <span id="connectBtnText">Connect WhatsApp</span>
+                        <div class="loader hidden" id="connectBtnLoader"></div>
+                    </button>
+                    <button class="btn btn-secondary" id="resetBtn">🔄 Reset Connection</button>
+                </div>
+            </div>
+
+            <div class="message-result hidden" id="messageResult"></div>
+
+            <!-- Single Message Mode -->
+            <div id="singleMode">
+                <div class="form-group">
+                    <label for="phoneNumber">📞 Phone Number (with country code)</label>
+                    <input type="tel" 
+                           class="form-control" 
+                           id="phoneNumber" 
+                           placeholder="e.g., 1234567890"
+                           maxlength="15">
+                </div>
+            </div>
+
+            <!-- Bulk Message Mode -->
+            <div id="bulkMode" class="hidden">
+                <div class="form-group">
+                    <label for="bulkNumbers">📞 Phone Numbers (comma-separated or line-separated, max 50)</label>
+                    <textarea class="form-control" 
+                              id="bulkNumbers" 
+                              placeholder="Enter numbers separated by commas or new lines:&#10;1234567890, 0987654321&#10;or&#10;1234567890&#10;0987654321"
+                              rows="6"></textarea>
+                </div>
+
+                <div class="progress-section hidden" id="bulkProgress">
+                    <h4>📊 Bulk Send Progress</h4>
+                    <div id="bulkProgressText">Preparing...</div>
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="progressFill"></div>
+                    </div>
+                    <div class="bulk-status" id="bulkStatus"></div>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="message">💬 Message</label>
+                <textarea class="form-control" 
+                          id="message" 
+                          placeholder="Type your message here... (Press Ctrl+Enter to send)"
+                          rows="4"></textarea>
+            </div>
+
+            <div class="btn-group">
+                <button class="btn btn-primary" id="sendBtn">
+                    <span id="sendBtnText">Send Message</span>
+                    <div class="loader hidden" id="sendBtnLoader"></div>
+                </button>
+                <button class="btn btn-primary hidden" id="sendBulkBtn">
+                    <span id="sendBulkBtnText">Send Bulk Messages</span>
+                    <div class="loader hidden" id="sendBulkBtnLoader"></div>
+                </button>
+            </div>
+
+            <div class="features">
+                <h3>✨ Platform Features</h3>
+                <div class="feature-list">
+                    <div class="feature-item">
+                        <span class="feature-icon">🎯</span>
+                        <span>Smart Mode Toggle</span>
+                    </div>
+                    <div class="feature-item">
+                        <span class="feature-icon">📊</span>
+                        <span>Real-time Progress Tracking</span>
+                    </div>
+                    <div class="feature-item">
+                        <span class="feature-icon">⚡</span>
+                        <span>Rate Limiting Protection</span>
+                    </div>
+                    <div class="feature-item">
+                        <span class="feature-icon">📈</span>
+                        <span>Detailed Result Analytics</span>
+                    </div>
+                    <div class="feature-item">
+                        <span class="feature-icon">🔒</span>
+                        <span>Input Validation</span>
+                    </div>
+                    <div class="feature-item">
+                        <span class="feature-icon">🚀</span>
+                        <span>Professional Interface</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Global variables
+        let isConnected = false;
+        let hasRequestedConnection = false;
+        let currentMode = 'single';
+
+        // DOM elements
+        const connectBtn = document.getElementById('connectBtn');
+        const connectBtnText = document.getElementById('connectBtnText');
+        const connectBtnLoader = document.getElementById('connectBtnLoader');
+        const resetBtn = document.getElementById('resetBtn');
+        const statusIndicator = document.getElementById('statusIndicator');
+        const statusText = document.getElementById('statusText');
+        const phoneNumberInput = document.getElementById('phoneNumber');
+        const bulkNumbersInput = document.getElementById('bulkNumbers');
+        const messageInput = document.getElementById('message');
+        const sendBtn = document.getElementById('sendBtn');
+        const sendBtnText = document.getElementById('sendBtnText');
+        const sendBtnLoader = document.getElementById('sendBtnLoader');
+        const sendBulkBtn = document.getElementById('sendBulkBtn');
+        const sendBulkBtnText = document.getElementById('sendBulkBtnText');
+        const sendBulkBtnLoader = document.getElementById('sendBulkBtnLoader');
+        const messageResult = document.getElementById('messageResult');
+        const singleModeBtn = document.getElementById('singleModeBtn');
+        const bulkModeBtn = document.getElementById('bulkModeBtn');
+        const singleMode = document.getElementById('singleMode');
+        const bulkMode = document.getElementById('bulkMode');
+        const bulkProgress = document.getElementById('bulkProgress');
+        const bulkProgressText = document.getElementById('bulkProgressText');
+        const progressFill = document.getElementById('progressFill');
+        const bulkStatus = document.getElementById('bulkStatus');
+
+        // Mode switching
+        singleModeBtn.addEventListener('click', () => switchMode('single'));
+        bulkModeBtn.addEventListener('click', () => switchMode('bulk'));
+
+        function switchMode(mode) {
+            currentMode = mode;
+            
+            if (mode === 'single') {
+                singleModeBtn.classList.add('active');
+                bulkModeBtn.classList.remove('active');
+                singleMode.classList.remove('hidden');
+                bulkMode.classList.add('hidden');
+                sendBtn.classList.remove('hidden');
+                sendBulkBtn.classList.add('hidden');
+            } else {
+                singleModeBtn.classList.remove('active');
+                bulkModeBtn.classList.add('active');
+                singleMode.classList.add('hidden');
+                bulkMode.classList.remove('hidden');
+                sendBtn.classList.add('hidden');
+                sendBulkBtn.classList.remove('hidden');
+            }
+            
+            clearMessage();
+        }
+
+        // Event listeners
+        connectBtn.addEventListener('click', connectWhatsApp);
+        resetBtn.addEventListener('click', resetConnection);
+        sendBtn.addEventListener('click', sendMessage);
+        sendBulkBtn.addEventListener('click', sendBulkMessage);
+
+        function updateConnectionStatus(status) {
+            isConnected = status === 'connected';
+            statusText.textContent = isConnected ? 'WhatsApp Connected ✅' : 'WhatsApp Disconnected ❌';
+            statusIndicator.classList.toggle('connected', isConnected);
+            enableMessaging(isConnected);
+        }
+
+        function enableMessaging(enabled) {
+            sendBtn.disabled = !enabled;
+            sendBulkBtn.disabled = !enabled;
+            if (enabled) {
+                connectBtnText.textContent = 'Connected ✅';
+                connectBtn.disabled = true;
+            } else {
+                connectBtnText.textContent = 'Connect WhatsApp';
+                connectBtn.disabled = false;
+            }
+        }
+
+        async function connectWhatsApp() {
+            if (hasRequestedConnection) return;
+            
+            hasRequestedConnection = true;
+            connectBtnText.textContent = 'Connecting...';
+            connectBtnLoader.classList.remove('hidden');
+            connectBtn.disabled = true;
+
+            try {
+                const response = await fetch('/api/connect', { method: 'POST' });
+                const data = await response.json();
+                
+                console.log('Connect response:', data);
+                
+                if (data.success) {
+                    if (data.qr) {
+                        showMessage('📱 QR Code generated! Please scan with WhatsApp on your phone.', 'success');
+                        
+                        // Check connection status periodically
+                        const checkInterval = setInterval(async () => {
+                            try {
+                                const statusResponse = await fetch('/api/status');
+                                const statusData = await statusResponse.json();
+                                
+                                if (statusData.status === 'connected') {
+                                    clearInterval(checkInterval);
+                                    updateConnectionStatus('connected');
+                                    showMessage('🎉 WhatsApp connected successfully!', 'success');
+                                    connectBtnLoader.classList.add('hidden');
+                                }
+                            } catch (error) {
+                                console.error('Status check error:', error);
+                            }
+                        }, 2000);
+                        
+                        // Stop checking after 2 minutes
+                        setTimeout(() => {
+                            clearInterval(checkInterval);
+                            if (!isConnected) {
+                                connectBtnText.textContent = 'Connect WhatsApp';
+                                connectBtn.disabled = false;
+                                connectBtnLoader.classList.add('hidden');
+                                hasRequestedConnection = false;
+                                showMessage('⏰ Connection timeout. Please try again.', 'error');
+                            }
+                        }, 120000);
+                        
+                    } else {
+                        showMessage('✅ WhatsApp is already connected!', 'success');
+                        updateConnectionStatus('connected');
+                        connectBtnLoader.classList.add('hidden');
+                    }
+                } else {
+                    throw new Error(data.error || 'Connection failed');
+                }
+                
+            } catch (error) {
+                console.error('Connection error:', error);
+                showMessage(`❌ Connection failed: ${error.message}`, 'error');
+                connectBtnText.textContent = 'Connect WhatsApp';
+                connectBtn.disabled = false;
+                connectBtnLoader.classList.add('hidden');
+                hasRequestedConnection = false;
+            }
+        }
+
         function resetConnection() {
             console.log('Resetting connection...');
             hasRequestedConnection = false;
