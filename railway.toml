@@ -1,0 +1,11 @@
+[build]
+builder = "NIXPACKS"
+
+[deploy]
+startCommand = "node server.js"
+
+[variables]
+NIXPACKS_NODE_VERSION = "18"
+
+[service]
+monitor = "/health"
