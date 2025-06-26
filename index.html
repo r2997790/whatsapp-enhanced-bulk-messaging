@@ -1,0 +1,202 @@
+        function resetConnection() {
+            console.log('Resetting connection...');
+            hasRequestedConnection = false;
+            fetch('/api/reset', { method: 'POST' })
+                .then(response => response.json())
+                .then(data => {
+                    console.log('Reset response:', data);
+                    updateConnectionStatus('disconnected');
+                })
+                .catch(error => {
+                    console.error('Reset error:', error);
+                });
+        }
+        
+        async function sendMessage() {
+            const phoneNumber = phoneNumberInput.value.trim();
+            const message = messageInput.value.trim();
+            
+            if (!phoneNumber || !message) {
+                showMessage('Please enter both phone number and message', 'error');
+                return;
+            }
+            
+            if (!isConnected) {
+                showMessage('WhatsApp is not connected', 'error');
+                return;
+            }
+            
+            sendBtnText.textContent = 'Sending...';
+            sendBtnLoader.classList.remove('hidden');
+            sendBtn.disabled = true;
+            
+            try {
+                const response = await fetch('/api/send-message', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ number: phoneNumber, message: message })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    showMessage('Message sent successfully!', 'success');
+                    messageInput.value = '';
+                } else {
+                    showMessage(`Failed to send message: ${result.error}`, 'error');
+                }
+                
+            } catch (error) {
+                console.error('Send message error:', error);
+                showMessage(`Error sending message: ${error.message}`, 'error');
+            } finally {
+                sendBtnText.textContent = 'Send Message';
+                sendBtnLoader.classList.add('hidden');
+                sendBtn.disabled = false;
+            }
+        }
+
+        async function sendBulkMessage() {
+            const numbersText = bulkNumbersInput.value.trim();
+            const message = messageInput.value.trim();
+            
+            if (!numbersText || !message) {
+                showMessage('Please enter both phone numbers and message', 'error');
+                return;
+            }
+            
+            if (!isConnected) {
+                showMessage('WhatsApp is not connected', 'error');
+                return;
+            }
+
+            // Parse numbers from text
+            let numbers = [];
+            if (numbersText.includes(',')) {
+                numbers = numbersText.split(',').map(n => n.trim()).filter(n => n);
+            } else {
+                numbers = numbersText.split('\n').map(n => n.trim()).filter(n => n);
+            }
+
+            if (numbers.length === 0) {
+                showMessage('No valid phone numbers found', 'error');
+                return;
+            }
+
+            if (numbers.length > 50) {
+                showMessage('Maximum 50 numbers allowed per bulk send', 'error');
+                return;
+            }
+            
+            sendBulkBtnText.textContent = 'Sending...';
+            sendBulkBtnLoader.classList.remove('hidden');
+            sendBulkBtn.disabled = true;
+            bulkProgress.classList.remove('hidden');
+            bulkProgressText.textContent = `Sending to ${numbers.length} contacts...`;
+            bulkStatus.innerHTML = '';
+            
+            try {
+                const response = await fetch('/api/send-bulk', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ numbers: numbers, message: message })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    const successCount = result.results.filter(r => r.success).length;
+                    const failCount = result.results.length - successCount;
+                    
+                    showMessage(`Bulk send completed! ${successCount} sent, ${failCount} failed.`, 'success');
+                    
+                    // Show detailed results
+                    let statusHtml = '<h4>Send Results:</h4>';
+                    result.results.forEach(r => {
+                        const status = r.success ? '✅' : '❌';
+                        const error = r.error ? ` (${r.error})` : '';
+                        statusHtml += `<div>${status} ${r.number}${error}</div>`;
+                    });
+                    bulkStatus.innerHTML = statusHtml;
+                    
+                    progressFill.style.width = '100%';
+                    bulkProgressText.textContent = `Completed: ${successCount}/${numbers.length} sent successfully`;
+                    
+                    // Clear inputs on success
+                    messageInput.value = '';
+                    bulkNumbersInput.value = '';
+                } else {
+                    showMessage(`Failed to send bulk messages: ${result.error}`, 'error');
+                }
+                
+            } catch (error) {
+                console.error('Bulk send error:', error);
+                showMessage(`Error sending bulk messages: ${error.message}`, 'error');
+            } finally {
+                sendBulkBtnText.textContent = 'Send Bulk Messages';
+                sendBulkBtnLoader.classList.add('hidden');
+                sendBulkBtn.disabled = false;
+            }
+        }
+        
+        function showMessage(text, type) {
+            messageResult.textContent = text;
+            messageResult.className = `message-result ${type}`;
+            messageResult.classList.remove('hidden');
+            
+            if (type === 'success') {
+                setTimeout(() => {
+                    messageResult.classList.add('hidden');
+                }, 8000);
+            }
+        }
+        
+        function clearMessage() {
+            messageResult.classList.add('hidden');
+        }
+        
+        // Phone number formatting
+        phoneNumberInput.addEventListener('input', (e) => {
+            let value = e.target.value.replace(/\D/g, '');
+            e.target.value = value;
+        });
+        
+        // Keyboard shortcuts
+        messageInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && e.ctrlKey) {
+                if (currentMode === 'single') {
+                    sendMessage();
+                } else {
+                    sendBulkMessage();
+                }
+            }
+        });
+        
+        phoneNumberInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                messageInput.focus();
+            }
+        });
+        
+        // Initialize on page load
+        document.addEventListener('DOMContentLoaded', () => {
+            console.log('🎯 Enhanced WhatsApp Platform Ready');
+            console.log('🚀 Bulk Messaging Activated');
+            enableMessaging(false);
+            
+            fetch('/api/status')
+                .then(response => response.json())
+                .then(data => {
+                    console.log('Initial status:', data);
+                    updateConnectionStatus(data.status);
+                })
+                .catch(error => {
+                    console.error('Status fetch error:', error);
+                    updateConnectionStatus('disconnected');
+                });
+        });
+        
+        console.log('🚀 Enhanced WhatsApp Platform with Bulk Messaging Loaded Successfully');
+    </script>
+</body>
+</html>
