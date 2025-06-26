@@ -1,0 +1,38 @@
+{
+  "name": "whatsapp-enhanced-bulk-messaging",
+  "version": "6.0.0-BULK-MESSAGING-ACTIVATED",
+  "description": "Enhanced WhatsApp messaging platform with activated bulk messaging functionality",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "build": "echo 'No build required'",
+    "dev": "nodemon server.js"
+  },
+  "keywords": [
+    "whatsapp",
+    "messaging",
+    "baileys",
+    "bulk-messaging",
+    "templates",
+    "personalization",
+    "contact-management",
+    "group-management",
+    "message-logs",
+    "analytics"
+  ],
+  "author": "r2997790",
+  "license": "MIT",
+  "dependencies": {
+    "@whiskeysockets/baileys": "^6.7.8",
+    "cors": "^2.8.5",
+    "express": "^4.18.2",
+    "qrcode": "^1.5.3",
+    "socket.io": "^4.7.2"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.1"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
