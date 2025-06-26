@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🚀 Enhanced WhatsApp Bulk Messaging Platform</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; color: #333; padding: 20px; }
+        .container { max-width: 800px; margin: 0 auto; background: white; border-radius: 20px; box-shadow: 0 20px 40px rgba(0,0,0,0.1); overflow: hidden; }
+        .header { background: linear-gradient(135deg, #25D366 0%, #128C7E 100%); color: white; padding: 30px; text-align: center; }
+        .header h1 { font-size: 2.5rem; margin-bottom: 10px; font-weight: 700; }
+        .header .subtitle { font-size: 1.1rem; opacity: 0.9; }
+        .main-content { padding: 30px; }
+        .status-section { background: #f8f9fa; border-radius: 12px; padding: 20px; margin-bottom: 30px; border-left: 4px solid #25D366; }
+        .btn { padding: 15px 30px; border: none; border-radius: 12px; font-size: 16px; font-weight: 600; cursor: pointer; transition: all 0.3s ease; display: inline-flex; align-items: center; gap: 10px; }
+        .btn-primary { background: linear-gradient(135deg, #25D366 0%, #128C7E 100%); color: white; }
+        .form-control { width: 100%; padding: 15px; border: 2px solid #e9ecef; border-radius: 12px; font-size: 16px; margin-bottom: 15px; }
+        textarea.form-control { resize: vertical; min-height: 120px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🚀 Enhanced WhatsApp Platform</h1>
+            <p class="subtitle">Professional Bulk Messaging Solution - WORKING VERSION</p>
+        </div>
+        <div class="main-content">
+            <div class="status-section">
+                <h3>🔗 Connection Status</h3>
+                <p>WhatsApp Connection: <span id="status">Disconnected</span></p>
+                <button class="btn btn-primary" onclick="connectWhatsApp()">Connect WhatsApp</button>
+            </div>
+            <div>
+                <input type="tel" class="form-control" id="phone" placeholder="Phone Number (with country code)">
+                <textarea class="form-control" id="message" placeholder="Your message here..."></textarea>
+                <button class="btn btn-primary" onclick="sendMessage()">Send Message</button>
+            </div>
+        </div>
+    </div>
+    <script>
+        function connectWhatsApp() {
+            document.getElementById('status').textContent = 'Connecting...';
+            fetch('/api/connect', { method: 'POST' })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        document.getElementById('status').textContent = 'Connected ✅';
+                    } else {
+                        document.getElementById('status').textContent = 'Failed ❌';
+                    }
+                })
+                .catch(error => {
+                    document.getElementById('status').textContent = 'Error ❌';
+                });
+        }
+        
+        function sendMessage() {
+            const phone = document.getElementById('phone').value;
+            const message = document.getElementById('message').value;
+            
+            if (!phone || !message) {
+                alert('Please enter both phone number and message');
+                return;
+            }
+            
+            fetch('/api/send-message', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ number: phone, message: message })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    alert('Message sent successfully!');
+                    document.getElementById('message').value = '';
+                } else {
+                    alert('Failed to send message: ' + data.error);
+                }
+            })
+            .catch(error => {
+                alert('Error: ' + error.message);
+            });
+        }
+        
+        console.log('🚀 WhatsApp Platform Loaded - Simple Test Version');
+    </script>
+</body>
+</html>
