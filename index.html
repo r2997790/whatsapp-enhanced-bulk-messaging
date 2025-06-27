@@ -106,6 +106,16 @@
             background: #25D366;
         }
 
+        .debug-info {
+            margin-top: 10px;
+            padding: 10px;
+            background: #f1f1f1;
+            border-radius: 8px;
+            font-size: 12px;
+            font-family: monospace;
+            color: #666;
+        }
+
         .form-group {
             margin-bottom: 25px;
         }
@@ -321,7 +331,7 @@
     <div class="container">
         <div class="header">
             <h1>🚀 Enhanced WhatsApp Platform</h1>
-            <p class="subtitle">Professional Bulk Messaging Solution v6.3.0 - COMPLETELY FIXED</p>
+            <p class="subtitle">Professional Bulk Messaging Solution v6.4.0 - SYNC FIXED</p>
         </div>
 
         <div class="mode-toggle">
@@ -337,6 +347,11 @@
                 <div class="status-item">
                     <div class="status-indicator" id="statusIndicator"></div>
                     <span id="statusText">Connecting...</span>
+                </div>
+                <div class="debug-info" id="debugInfo">
+                    Status: <span id="debugStatus">unknown</span> | 
+                    Socket: <span id="debugSocket">unknown</span> | 
+                    Frontend: <span id="debugFrontend">unknown</span>
                 </div>
                 <div class="btn-group">
                     <button class="btn btn-primary" id="connectBtn">
@@ -433,16 +448,27 @@
     </div>
 
     <script>
-        let isConnected = false;
+        // ENHANCED: Better state management
+        let connectionState = {
+            status: 'disconnected',
+            isConnected: false,
+            isSocketConnected: false,
+            backendStatus: 'unknown'
+        };
         let hasRequestedConnection = false;
         let currentMode = 'single';
 
+        // DOM elements
         const connectBtn = document.getElementById('connectBtn');
         const connectBtnText = document.getElementById('connectBtnText');
         const connectBtnLoader = document.getElementById('connectBtnLoader');
         const resetBtn = document.getElementById('resetBtn');
         const statusIndicator = document.getElementById('statusIndicator');
         const statusText = document.getElementById('statusText');
+        const debugInfo = document.getElementById('debugInfo');
+        const debugStatus = document.getElementById('debugStatus');
+        const debugSocket = document.getElementById('debugSocket');
+        const debugFrontend = document.getElementById('debugFrontend');
         const phoneNumberInput = document.getElementById('phoneNumber');
         const bulkNumbersInput = document.getElementById('bulkNumbers');
         const messageInput = document.getElementById('message');
@@ -462,6 +488,65 @@
         const progressFill = document.getElementById('progressFill');
         const bulkStatus = document.getElementById('bulkStatus');
 
+        // ENHANCED: Better status checking
+        async function checkConnectionStatus() {
+            try {
+                const response = await fetch('/api/status');
+                const data = await response.json();
+                
+                console.log('🔍 Status check response:', data);
+                
+                // Update connection state with backend info
+                connectionState.status = data.status;
+                connectionState.isConnected = data.isConnected || false;
+                connectionState.isSocketConnected = data.isConnected || false;
+                connectionState.backendStatus = data.status;
+                
+                updateConnectionDisplay();
+                return data;
+            } catch (error) {
+                console.error('❌ Status check failed:', error);
+                connectionState.status = 'error';
+                connectionState.isConnected = false;
+                connectionState.isSocketConnected = false;
+                connectionState.backendStatus = 'error';
+                updateConnectionDisplay();
+                return null;
+            }
+        }
+
+        // ENHANCED: Better UI updates
+        function updateConnectionDisplay() {
+            const isConnected = connectionState.isSocketConnected;
+            
+            // Update main status
+            statusText.textContent = isConnected ? 'WhatsApp Connected ✅' : 'WhatsApp Disconnected ❌';
+            statusIndicator.classList.toggle('connected', isConnected);
+            
+            // Update debug info
+            debugStatus.textContent = connectionState.backendStatus;
+            debugSocket.textContent = connectionState.isSocketConnected ? 'Connected' : 'Disconnected';
+            debugFrontend.textContent = isConnected ? 'Ready' : 'Not Ready';
+            
+            // Update buttons
+            enableMessaging(isConnected);
+            
+            console.log('🔄 UI Updated:', connectionState);
+        }
+
+        function enableMessaging(enabled) {
+            sendBtn.disabled = !enabled;
+            sendBulkBtn.disabled = !enabled;
+            if (enabled) {
+                connectBtnText.textContent = 'Connected ✅';
+                connectBtn.disabled = true;
+            } else {
+                connectBtnText.textContent = 'Connect WhatsApp';
+                connectBtn.disabled = false;
+            }
+        }
+
+        // Mode switching
         singleModeBtn.addEventListener('click', () => switchMode('single'));
         bulkModeBtn.addEventListener('click', () => switchMode('bulk'));
 
@@ -486,29 +571,11 @@
             clearMessage();
         }
 
+        // Event listeners
         connectBtn.addEventListener('click', connectWhatsApp);
         resetBtn.addEventListener('click', resetConnection);
         sendBtn.addEventListener('click', sendMessage);
         sendBulkBtn.addEventListener('click', sendBulkMessage);
-
-        function updateConnectionStatus(status) {
-            isConnected = status === 'connected';
-            statusText.textContent = isConnected ? 'WhatsApp Connected ✅' : 'WhatsApp Disconnected ❌';
-            statusIndicator.classList.toggle('connected', isConnected);
-            enableMessaging(isConnected);
-        }
-
-        function enableMessaging(enabled) {
-            sendBtn.disabled = !enabled;
-            sendBulkBtn.disabled = !enabled;
-            if (enabled) {
-                connectBtnText.textContent = 'Connected ✅';
-                connectBtn.disabled = true;
-            } else {
-                connectBtnText.textContent = 'Connect WhatsApp';
-                connectBtn.disabled = false;
-            }
-        }
 
         async function connectWhatsApp() {
             if (hasRequestedConnection) return;
@@ -522,31 +589,26 @@
                 const response = await fetch('/api/connect', { method: 'POST' });
                 const data = await response.json();
                 
-                console.log('Connect response:', data);
+                console.log('🔌 Connect response:', data);
                 
                 if (data.success) {
                     if (data.qr) {
                         showMessage('📱 QR Code generated! Please scan with WhatsApp on your phone.', 'success');
                         
+                        // Enhanced status checking
                         const checkInterval = setInterval(async () => {
-                            try {
-                                const statusResponse = await fetch('/api/status');
-                                const statusData = await statusResponse.json();
-                                
-                                if (statusData.status === 'connected') {
-                                    clearInterval(checkInterval);
-                                    updateConnectionStatus('connected');
-                                    showMessage('🎉 WhatsApp connected successfully!', 'success');
-                                    connectBtnLoader.classList.add('hidden');
-                                }
-                            } catch (error) {
-                                console.error('Status check error:', error);
+                            const statusData = await checkConnectionStatus();
+                            if (statusData && statusData.isConnected) {
+                                clearInterval(checkInterval);
+                                showMessage('🎉 WhatsApp connected successfully!', 'success');
+                                connectBtnLoader.classList.add('hidden');
+                                hasRequestedConnection = false;
                             }
                         }, 2000);
                         
                         setTimeout(() => {
                             clearInterval(checkInterval);
-                            if (!isConnected) {
+                            if (!connectionState.isSocketConnected) {
                                 connectBtnText.textContent = 'Connect WhatsApp';
                                 connectBtn.disabled = false;
                                 connectBtnLoader.classList.add('hidden');
@@ -557,15 +619,16 @@
                         
                     } else {
                         showMessage('✅ WhatsApp is already connected!', 'success');
-                        updateConnectionStatus('connected');
+                        await checkConnectionStatus();
                         connectBtnLoader.classList.add('hidden');
+                        hasRequestedConnection = false;
                     }
                 } else {
                     throw new Error(data.error || 'Connection failed');
                 }
                 
             } catch (error) {
-                console.error('Connection error:', error);
+                console.error('❌ Connection error:', error);
                 showMessage(`❌ Connection failed: ${error.message}`, 'error');
                 connectBtnText.textContent = 'Connect WhatsApp';
                 connectBtn.disabled = false;
@@ -574,31 +637,46 @@
             }
         }
 
-        function resetConnection() {
-            console.log('Resetting connection...');
+        async function resetConnection() {
+            console.log('🔄 Resetting connection...');
             hasRequestedConnection = false;
-            fetch('/api/reset', { method: 'POST' })
-                .then(response => response.json())
-                .then(data => {
-                    console.log('Reset response:', data);
-                    updateConnectionStatus('disconnected');
-                })
-                .catch(error => {
-                    console.error('Reset error:', error);
-                });
+            
+            try {
+                const response = await fetch('/api/reset', { method: 'POST' });
+                const data = await response.json();
+                console.log('🔄 Reset response:', data);
+                
+                // Force update status after reset
+                setTimeout(async () => {
+                    await checkConnectionStatus();
+                    showMessage('🔄 Connection has been reset', 'success');
+                }, 1000);
+                
+            } catch (error) {
+                console.error('❌ Reset error:', error);
+                showMessage('❌ Reset failed', 'error');
+            }
         }
         
         async function sendMessage() {
             const phoneNumber = phoneNumberInput.value.trim();
             const message = messageInput.value.trim();
             
+            console.log('📤 Send message attempt:', {
+                phone: phoneNumber,
+                connected: connectionState.isSocketConnected,
+                status: connectionState.status
+            });
+            
             if (!phoneNumber || !message) {
                 showMessage('Please enter both phone number and message', 'error');
                 return;
             }
             
-            if (!isConnected) {
-                showMessage('WhatsApp is not connected', 'error');
+            // ENHANCED: Check actual connection state
+            if (!connectionState.isSocketConnected) {
+                showMessage('WhatsApp is not connected. Please connect first.', 'error');
+                await checkConnectionStatus(); // Refresh status
                 return;
             }
             
@@ -616,15 +694,18 @@
                 const result = await response.json();
                 
                 if (result.success) {
-                    showMessage('Message sent successfully!', 'success');
+                    showMessage('✅ Message sent successfully!', 'success');
                     messageInput.value = '';
                 } else {
-                    showMessage(`Failed to send message: ${result.error}`, 'error');
+                    showMessage(`❌ Failed to send message: ${result.error}`, 'error');
+                    if (result.debug) {
+                        console.error('Debug info:', result.debug);
+                    }
                 }
                 
             } catch (error) {
-                console.error('Send message error:', error);
-                showMessage(`Error sending message: ${error.message}`, 'error');
+                console.error('❌ Send message error:', error);
+                showMessage(`❌ Error sending message: ${error.message}`, 'error');
             } finally {
                 sendBtnText.textContent = 'Send Message';
                 sendBtnLoader.classList.add('hidden');
@@ -636,13 +717,21 @@
             const numbersText = bulkNumbersInput.value.trim();
             const message = messageInput.value.trim();
             
+            console.log('📤 Bulk send attempt:', {
+                numbersCount: numbersText.split(/[,\n]/).length,
+                connected: connectionState.isSocketConnected,
+                status: connectionState.status
+            });
+            
             if (!numbersText || !message) {
                 showMessage('Please enter both phone numbers and message', 'error');
                 return;
             }
             
-            if (!isConnected) {
-                showMessage('WhatsApp is not connected', 'error');
+            // ENHANCED: Check actual connection state
+            if (!connectionState.isSocketConnected) {
+                showMessage('WhatsApp is not connected. Please connect first.', 'error');
+                await checkConnectionStatus(); // Refresh status
                 return;
             }
 
@@ -683,7 +772,7 @@
                     const successCount = result.results.filter(r => r.success).length;
                     const failCount = result.results.length - successCount;
                     
-                    showMessage(`Bulk send completed! ${successCount} sent, ${failCount} failed.`, 'success');
+                    showMessage(`✅ Bulk send completed! ${successCount} sent, ${failCount} failed.`, 'success');
                     
                     let statusHtml = '<h4>Send Results:</h4>';
                     result.results.forEach(r => {
@@ -699,12 +788,15 @@
                     messageInput.value = '';
                     bulkNumbersInput.value = '';
                 } else {
-                    showMessage(`Failed to send bulk messages: ${result.error}`, 'error');
+                    showMessage(`❌ Failed to send bulk messages: ${result.error}`, 'error');
+                    if (result.debug) {
+                        console.error('Debug info:', result.debug);
+                    }
                 }
                 
             } catch (error) {
-                console.error('Bulk send error:', error);
-                showMessage(`Error sending bulk messages: ${error.message}`, 'error');
+                console.error('❌ Bulk send error:', error);
+                showMessage(`❌ Error sending bulk messages: ${error.message}`, 'error');
             } finally {
                 sendBulkBtnText.textContent = 'Send Bulk Messages';
                 sendBulkBtnLoader.classList.add('hidden');
@@ -728,11 +820,13 @@
             messageResult.classList.add('hidden');
         }
         
+        // Phone number formatting
         phoneNumberInput.addEventListener('input', (e) => {
             let value = e.target.value.replace(/\D/g, '');
             e.target.value = value;
         });
         
+        // Keyboard shortcuts
         messageInput.addEventListener('keydown', (e) => {
             if (e.key === 'Enter' && e.ctrlKey) {
                 if (currentMode === 'single') {
@@ -749,24 +843,19 @@
             }
         });
         
-        document.addEventListener('DOMContentLoaded', () => {
-            console.log('🎯 Enhanced WhatsApp Platform Ready - v6.3.0 COMPLETELY FIXED');
+        // ENHANCED: Better initialization
+        document.addEventListener('DOMContentLoaded', async () => {
+            console.log('🎯 Enhanced WhatsApp Platform Ready - v6.4.0 SYNC FIXED');
             console.log('🚀 Bulk Messaging Activated');
-            enableMessaging(false);
             
-            fetch('/api/status')
-                .then(response => response.json())
-                .then(data => {
-                    console.log('Initial status:', data);
-                    updateConnectionStatus(data.status);
-                })
-                .catch(error => {
-                    console.error('Status fetch error:', error);
-                    updateConnectionStatus('disconnected');
-                });
+            // Initial status check
+            await checkConnectionStatus();
+            
+            // Periodic status checks
+            setInterval(checkConnectionStatus, 10000); // Check every 10 seconds
         });
         
-        console.log('🚀 Enhanced WhatsApp Platform with Bulk Messaging Loaded Successfully - v6.3.0 COMPLETELY FIXED');
+        console.log('🚀 Enhanced WhatsApp Platform with Bulk Messaging Loaded Successfully - v6.4.0 SYNC FIXED');
     </script>
 </body>
 </html>
