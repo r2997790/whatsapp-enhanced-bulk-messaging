@@ -26,7 +26,7 @@ app.use(express.static('.'));
 
 const PORT = process.env.PORT || 8080;
 
-// State management
+// State management - ENHANCED with better tracking
 let sock = null;
 let qrCodeData = null;
 let connectionStatus = 'disconnected';
@@ -56,6 +56,25 @@ const logger = {
     trace: () => {},
     child: () => logger
 };
+
+// ENHANCED: Better connection state tracking
+function updateConnectionStatus(newStatus) {
+    const oldStatus = connectionStatus;
+    connectionStatus = newStatus;
+    console.log(`🔄 Connection status: ${oldStatus} → ${connectionStatus}`);
+    
+    // Emit to all connected clients
+    io.emit('connection-status', connectionStatus);
+    
+    return connectionStatus;
+}
+
+// ENHANCED: Check if socket is actually connected
+function isSocketConnected() {
+    const connected = sock && sock.ws && sock.ws.readyState === 1 && connectionStatus === 'connected';
+    console.log(`🔍 Socket check: sock=${!!sock}, ws=${!!sock?.ws}, readyState=${sock?.ws?.readyState}, status=${connectionStatus}, result=${connected}`);
+    return connected;
+}
 
 function canAttemptConnection() {
     const now = Date.now();
@@ -88,7 +107,7 @@ async function connectToWhatsApp() {
     }
 
     if (!canAttemptConnection()) {
-        io.emit('connection-status', 'cooldown');
+        updateConnectionStatus('cooldown');
         return;
     }
 
@@ -98,6 +117,7 @@ async function connectToWhatsApp() {
         lastQRTime = Date.now();
         
         console.log(`🔄 Connection attempt ${connectionAttempts}/5`);
+        updateConnectionStatus('connecting');
 
         if (sock) {
             try {
@@ -132,7 +152,7 @@ async function connectToWhatsApp() {
             const { connection, lastDisconnect, qr } = update;
             const statusCode = lastDisconnect?.error?.output?.statusCode;
             
-            console.log('📡 Update:', { 
+            console.log('📡 Connection Update:', { 
                 connection, 
                 qr: !!qr, 
                 statusCode,
@@ -149,9 +169,8 @@ async function connectToWhatsApp() {
                         errorCorrectionLevel: 'M'
                     });
                     
-                    connectionStatus = 'qr-ready';
+                    updateConnectionStatus('qr-ready');
                     io.emit('qr-code', qrCodeData);
-                    io.emit('connection-status', connectionStatus);
                     console.log('✅ QR Code sent to all connected clients');
                 } catch (error) {
                     console.error('❌ QR error:', error);
@@ -160,25 +179,21 @@ async function connectToWhatsApp() {
 
             if (connection === 'open') {
                 console.log('🎉 CONNECTION SUCCESSFUL!');
-                connectionStatus = 'connected';
+                updateConnectionStatus('connected');
                 qrCodeData = null;
                 isConnecting = false;
                 resetConnectionState();
-                
-                io.emit('connection-status', connectionStatus);
                 io.emit('qr-code', null);
                 
             } else if (connection === 'connecting') {
                 console.log('🔗 Authenticating...');
-                connectionStatus = 'connecting';
-                io.emit('connection-status', connectionStatus);
+                updateConnectionStatus('connecting');
                 
             } else if (connection === 'close') {
                 console.log('🔌 Connection closed:', statusCode);
                 
-                connectionStatus = 'disconnected';
+                updateConnectionStatus('disconnected');
                 isConnecting = false;
-                io.emit('connection-status', connectionStatus);
                 
                 let shouldReconnect = false;
                 
@@ -233,9 +248,8 @@ async function connectToWhatsApp() {
 
     } catch (error) {
         console.error('❌ Setup error:', error);
-        connectionStatus = 'error';
+        updateConnectionStatus('error');
         isConnecting = false;
-        io.emit('connection-status', connectionStatus);
     }
 }
 
@@ -256,14 +270,12 @@ function manualReset() {
     } catch (e) {}
     
     resetConnectionState();
-    connectionStatus = 'disconnected';
+    updateConnectionStatus('disconnected');
     qrCodeData = null;
-    
-    io.emit('connection-status', connectionStatus);
     io.emit('qr-code', null);
 }
 
-// DIAGNOSTIC ROUTE TO CHECK FILE STATUS
+// ENHANCED DIAGNOSTIC ROUTE
 app.get('/debug', (req, res) => {
     try {
         const indexPath = path.join(__dirname, 'index.html');
@@ -289,6 +301,16 @@ app.get('/debug', (req, res) => {
         
         res.json({
             timestamp: new Date().toISOString(),
+            connection: {
+                status: connectionStatus,
+                isConnecting: isConnecting,
+                attempts: connectionAttempts,
+                sockExists: !!sock,
+                sockWsExists: !!sock?.ws,
+                sockReadyState: sock?.ws?.readyState,
+                isSocketConnected: isSocketConnected(),
+                hasQR: !!qrCodeData
+            },
             indexHtml: {
                 exists: indexExists,
                 size: indexStats?.size,
@@ -324,6 +346,7 @@ app.get('/health', (req, res) => {
     res.json({
         status: 'ok',
         whatsapp: connectionStatus,
+        isConnected: isSocketConnected(),
         attempts: connectionAttempts,
         timestamp: new Date().toISOString(),
         contacts: contacts.length,
@@ -336,6 +359,7 @@ app.get('/health', (req, res) => {
 app.get('/api/status', (req, res) => {
     res.json({
         status: connectionStatus,
+        isConnected: isSocketConnected(),
         hasQR: !!qrCodeData,
         isConnecting: isConnecting,
         attempts: connectionAttempts,
@@ -345,8 +369,12 @@ app.get('/api/status', (req, res) => {
 
 app.post('/api/connect', (req, res) => {
     console.log('🔌 Connect API called');
-    connectToWhatsApp();
-    res.json({ success: true, message: 'Connection initiated' });
+    if (connectionStatus === 'connected' && isSocketConnected()) {
+        res.json({ success: true, message: 'Already connected', qr: null });
+    } else {
+        connectToWhatsApp();
+        res.json({ success: true, message: 'Connection initiated', qr: qrCodeData });
+    }
 });
 
 app.post('/api/reset', (req, res) => {
@@ -354,13 +382,23 @@ app.post('/api/reset', (req, res) => {
     res.json({ success: true, message: 'Connection reset' });
 });
 
-// Enhanced messaging API
+// ENHANCED messaging API with better validation
 app.post('/api/send-message', async (req, res) => {
     try {
         const { number, message } = req.body;
         
-        if (!sock || connectionStatus !== 'connected') {
-            return res.status(400).json({ error: 'WhatsApp not connected' });
+        console.log(`📤 Send message request: number=${number}, connected=${isSocketConnected()}, status=${connectionStatus}`);
+        
+        if (!isSocketConnected()) {
+            return res.status(400).json({ 
+                error: 'WhatsApp not connected',
+                debug: {
+                    status: connectionStatus,
+                    sockExists: !!sock,
+                    sockWsExists: !!sock?.ws,
+                    sockReadyState: sock?.ws?.readyState
+                }
+            });
         }
 
         let formattedNumber = number.toString().replace(/[^\d]/g, '');
@@ -379,20 +417,31 @@ app.post('/api/send-message', async (req, res) => {
             type: 'single'
         });
 
+        console.log(`✅ Message sent successfully to ${number}`);
         res.json({ success: true, message: 'Message sent successfully' });
     } catch (error) {
-        console.error('Send message error:', error);
-        res.status(500).json({ error: 'Failed to send message' });
+        console.error('❌ Send message error:', error);
+        res.status(500).json({ error: 'Failed to send message', details: error.message });
     }
 });
 
-// ENHANCED BULK MESSAGING API
+// ENHANCED BULK MESSAGING API with better validation
 app.post('/api/send-bulk', async (req, res) => {
     try {
         const { numbers, message } = req.body;
         
-        if (!sock || connectionStatus !== 'connected') {
-            return res.status(400).json({ error: 'WhatsApp not connected' });
+        console.log(`📤 Bulk send request: ${numbers?.length} numbers, connected=${isSocketConnected()}, status=${connectionStatus}`);
+        
+        if (!isSocketConnected()) {
+            return res.status(400).json({ 
+                error: 'WhatsApp not connected',
+                debug: {
+                    status: connectionStatus,
+                    sockExists: !!sock,
+                    sockWsExists: !!sock?.ws,
+                    sockReadyState: sock?.ws?.readyState
+                }
+            });
         }
 
         if (!Array.isArray(numbers) || numbers.length === 0) {
@@ -424,10 +473,13 @@ app.post('/api/send-bulk', async (req, res) => {
                     type: 'bulk'
                 });
                 
+                console.log(`✅ Bulk message sent to ${number}`);
+                
                 if (numbers.length > 1) {
                     await delay(2000);
                 }
             } catch (error) {
+                console.error(`❌ Failed to send to ${number}:`, error);
                 results.push({ number, success: false, error: error.message });
                 
                 messageLogs.push({
@@ -442,14 +494,17 @@ app.post('/api/send-bulk', async (req, res) => {
             }
         }
         
+        const successCount = results.filter(r => r.success).length;
+        console.log(`✅ Bulk send completed: ${successCount}/${numbers.length} successful`);
+        
         res.json({ 
             success: true, 
             message: 'Bulk send completed',
             results: results 
         });
     } catch (error) {
-        console.error('Bulk send error:', error);
-        res.status(500).json({ error: 'Failed to send bulk messages' });
+        console.error('❌ Bulk send error:', error);
+        res.status(500).json({ error: 'Failed to send bulk messages', details: error.message });
     }
 });
 
@@ -457,13 +512,14 @@ app.post('/api/send-bulk', async (req, res) => {
 io.on('connection', (socket) => {
     console.log(`👤 Client connected: ${socket.id}`);
     
+    // Send current status immediately
     socket.emit('connection-status', connectionStatus);
     if (qrCodeData) {
         socket.emit('qr-code', qrCodeData);
     }
 
     socket.on('connect-whatsapp', () => {
-        console.log('🔌 Client requested connection');
+        console.log('🔌 Client requested connection via Socket.IO');
         if (connectionStatus === 'disconnected' || connectionStatus === 'error') {
             if (canAttemptConnection()) {
                 connectToWhatsApp();
@@ -474,7 +530,7 @@ io.on('connection', (socket) => {
     });
 
     socket.on('reset-connection', () => {
-        console.log('🔄 Client requested reset');
+        console.log('🔄 Client requested reset via Socket.IO');
         manualReset();
     });
 
